@@ -3,10 +3,14 @@ package com.notemaster.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.*
 import com.notemaster.app.ui.*
 
@@ -32,6 +36,7 @@ fun AppRoot() {
         Triple("write", "写歌", "✍️")
     )
     Scaffold(
+        containerColor = Color(0xFF1C1B22),
         bottomBar = {
             NavigationBar {
                 val cur = nav.currentBackStackEntryAsState().value?.destination?.route
@@ -52,7 +57,16 @@ fun AppRoot() {
             }
         }
     ) { pad ->
-        NavHost(nav, startDestination = "learn", modifier = Modifier.padding(pad)) {
+        NavHost(
+            nav,
+            startDestination = "learn",
+            modifier = Modifier.padding(pad).background(Color(0xFF1C1B22)),
+            // 关闭切页过渡动画：切换导航栏时页面直接切换，避免闪烁
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) {
             composable("learn") { LearnScreen() }
             composable("train") { TrainScreen() }
             composable("piano") { PianoScreen() }

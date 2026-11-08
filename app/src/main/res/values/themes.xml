@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.NoteMaster" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">#FF6750A4</item>
+    <style name="Theme.NoteMaster" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#FF1C1B22</item>
+        <item name="android:navigationBarColor">#FF1C1B22</item>
+        <item name="android:windowBackground">#FF1C1B22</item>
+        <item name="android:colorPrimary">#FF6750A4</item>
+        <item name="android:colorAccent">#FF6750A4</item>
     </style>
 </resources>

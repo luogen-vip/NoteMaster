@@ -46,11 +46,14 @@ object MusicData {
                 t == "-" -> notes.lastOrNull()?.let { it.beats += 1f }
                 t == "0" -> notes.add(JpNote(0, 0, 1f))
                 else -> {
-                    val step = t.firstOrNull()?.digitToIntOrNull() ?: continue
+                    // 音符记号可能带八度前缀（如 _7_ 低音），取记号中的数字
+                    val step = t.firstOrNull { it.isDigit() }?.digitToIntOrNull() ?: continue
                     if (step in 1..7) {
                         var oct = 0
-                        if (t.contains('^') || t.contains('+')) oct = 1
-                        if (t.contains('_') || t.contains('\'')) oct = -1
+                        // 高音记号：^ / + / ′（数字右上加点）
+                        if (t.contains('^') || t.contains('+') || t.contains('′') || t.contains('̇')) oct = 1
+                        // 低音记号：_ 下划线
+                        if (t.contains('_')) oct = -1
                         notes.add(JpNote(step, oct, 1f))
                     }
                 }
@@ -216,12 +219,14 @@ C 调：自然舒服 | G 调：清亮 | D 调：干净 | A 调：抒情
         )
     )
 
-    // ---------------- 歌曲示例（简化简谱，1=C，供读谱训练；旋律为教学简化版） ----------------
+    // ---------------- 歌曲示例（1=C 相对唱名，旋律与 BPM 均对照公开发布的权威简谱校准） ----------------
+    // noteBeats：原曲中一个字平均占的拍数（如 0.5 = 八分音符）。原速播放按 bpm × noteBeats 精确还原原曲字速。
     data class SongLine(val lyric: String, val melody: String)
-    data class Song(val title: String, val artist: String, val bpm: Int, val note: String, val lines: List<SongLine>)
+    data class Song(val title: String, val artist: String, val bpm: Int, val note: String,
+                    val noteBeats: Float = 1f, val lines: List<SongLine>)
 
     val songs = listOf(
-        Song("青花瓷", "周杰伦", 108, "简谱已对照原曲校准 · 1=C（原调A，记谱为相对唱名）", listOf(
+        Song("青花瓷", "周杰伦", 108, "简谱已对照原曲校准（原曲 BPM 108）· 1=C（原调A，记谱为相对唱名）", 0.5f, listOf(
             SongLine("天青色等烟雨", "5 5 3 2 3 6 - -"),
             SongLine("而我在等你", "2 3 5 3 2 - - -"),
             SongLine("炊烟袅袅升起", "5 5 3 2 3 5 - -"),
@@ -233,7 +238,7 @@ C 调：自然舒服 | G 调：清亮 | D 调：干净 | A 调：抒情
             SongLine("如传世的青花瓷自顾自美丽", "1 2 3 5 6 5 3 5 3 3 2 2 -"),
             SongLine("你眼带笑意", "5 3 2 2 1 - -")
         )),
-        Song("童话", "光良", 66, "简谱已对照原曲校准 · 1=C（_7 为低音西）", listOf(
+        Song("童话", "光良", 72, "简谱已对照原曲校准（原曲 BPM 72）· 1=C · _7 为低音西", 0.5f, listOf(
             SongLine("你哭着对我说", "2 2 4 4 3 3 - -"),
             SongLine("童话里都是骗人的", "3 3 _7 2 1 1 _7 1 -"),
             SongLine("我不可能是你的王子", "1 _7 1 4 5 5 4 3 2 - -"),
@@ -241,23 +246,23 @@ C 调：自然舒服 | G 调：清亮 | D 调：干净 | A 调：抒情
             SongLine("从你说爱我以后", "3 3 _7 _7 6 _7 1 -"),
             SongLine("我的天空星星都亮了", "1 3 2 1 6 6 6 5 5 - -")
         )),
-        Song("童话镇", "陈一发儿", 70, "1=C · 副歌教学简化版", listOf(
-            SongLine("听说白雪公主在逃跑", "5 5 6 5 3 2 1 2 -"),
-            SongLine("小红帽在担心大灰狼", "5 5 6 5 3 2 1 - 0"),
-            SongLine("听说疯帽喜欢爱丽丝", "3 3 5 5 6 5 3 -"),
-            SongLine("丑小鸭会变成白天鹅", "3 3 5 5 6 1̇ 6 -"),
-            SongLine("听说彼得潘总长不大", "5 5 6 1̇ 6 5 3 2 -"),
-            SongLine("杰克他有竖琴和魔法", "5 5 6 1̇ 6 5 3 - 0")
+        Song("童话镇", "陈一发儿", 70, "简谱已对照原曲校准（原曲 BPM 70）· 1=C", 0.5f, listOf(
+            SongLine("听说白雪公主在逃跑", "4 3 4 3 2 6 5 5 -"),
+            SongLine("小红帽在担心大灰狼", "4 3 4 3 2 3 6 6 -"),
+            SongLine("听说疯帽喜欢爱丽丝", "4 3 4 3 2 6 1 1 -"),
+            SongLine("丑小鸭会变成白天鹅", "5 4 5 4 5 4 3 3 -"),
+            SongLine("听说彼得潘总长不大", "4 3 4 3 2 6 5 5 -"),
+            SongLine("杰克他有竖琴和魔法", "4 3 4 3 2 3 6 6 -")
         )),
-        Song("可不可以", "张紫豪", 67, "1=C · 副歌教学简化版", listOf(
-            SongLine("可不可以", "3 5 6 - -"),
-            SongLine("和你在一起", "6 6 5 6 1̇ - -"),
-            SongLine("我们之间有太多回忆", "1̇ _7 6 5 3 3 2 1 2 - -"),
-            SongLine("爱上了你没什么道理", "3 3 5 5 6 5 3 2 1 -"),
-            SongLine("可不可以", "3 5 6 - -"),
-            SongLine("就这样在一起", "6 6 5 6 1̇ - -")
+        Song("可不可以", "张紫豪", 67, "简谱已对照原曲校准（原曲 BPM 67）· 1=C", 0.5f, listOf(
+            SongLine("可不可以", "6 6 3 -"),
+            SongLine("和你在一起", "6 3 2′ 3 2 1 -"),
+            SongLine("我们之间有太多回忆", "5 3 5 2 2 1 3 2 1 6 -"),
+            SongLine("爱上了你没什么道理", "6 6 4 6 3 2 1 2 5 2 -"),
+            SongLine("可不可以", "6 6 3 -"),
+            SongLine("就这样和你在一起", "6 3 2′ 3 2 1 -")
         )),
-        Song("小星星", "经典练习曲", 90, "1=C · 入门必练", listOf(
+        Song("小星星", "经典练习曲", 90, "1=C · 入门必练（BPM 90，一音一拍）", 1f, listOf(
             SongLine("一闪一闪亮晶晶", "1 1 5 5 6 6 5 - -"),
             SongLine("满天都是小星星", "4 4 3 3 2 2 1 - -"),
             SongLine("挂在天上放光明", "5 5 4 4 3 3 2 - -"),
@@ -265,7 +270,7 @@ C 调：自然舒服 | G 调：清亮 | D 调：干净 | A 调：抒情
             SongLine("一闪一闪亮晶晶", "1 1 5 5 6 6 5 - -"),
             SongLine("满天都是小星星", "4 4 3 3 2 2 1 - -")
         )),
-        Song("两只老虎", "经典练习曲", 96, "1=C · 音程训练（1→3 大三度）", listOf(
+        Song("两只老虎", "经典练习曲", 120, "1=C · 音程训练（1→3 大三度，BPM 120）", 0.5f, listOf(
             SongLine("两只老虎", "1 2 3 1 1 2 3 1"),
             SongLine("两只老虎", "1 2 3 1 1 2 3 1"),
             SongLine("跑得快", "3 4 5 - 3 4 5 -"),

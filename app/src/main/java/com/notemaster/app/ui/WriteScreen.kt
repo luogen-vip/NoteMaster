@@ -2,7 +2,7 @@ package com.notemaster.app.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,12 +24,16 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun WriteScreen() {
-    val listState = rememberLazyListState()
+    // 用 Saver 保存滚动位置：切走再切回，停在哪里就还在哪里，不再自动跳回八格创作板
+    val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
     var feedback by rememberSaveable { mutableStateOf("") }
 
-    // 提示文字变化时自动滚到底部，确保完整可见
+    // 记录上一次的反馈内容：只有反馈真正变化时才自动滚动，
+    // 否则切走再切回页面会重新触发 LaunchedEffect，把页面强拉到八格创作板
+    var lastFeedback by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(feedback) {
-        if (feedback.isNotEmpty()) {
+        if (feedback.isNotEmpty() && feedback != lastFeedback) {
+            lastFeedback = feedback
             kotlinx.coroutines.delay(200)
             runCatching { listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
         }

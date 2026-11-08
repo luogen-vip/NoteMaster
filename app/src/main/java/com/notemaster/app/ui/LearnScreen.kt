@@ -4,10 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,28 +48,40 @@ fun LearnScreen() {
                 Column(Modifier.padding(16.dp)) {
                     Text("核心对照表（背到脱口而出）", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Spacer(Modifier.height(10.dp))
-                    // 7 列等宽对齐：数字 / 唱名 / 音名 一一竖向对齐
-                    Row {
+                    // 7 列等宽自适应：数字 / 唱名 / 音名 一一竖向对齐，保证第 7 列不被裁剪
+                    Row(Modifier.fillMaxWidth()) {
                         MusicData.solfege.forEachIndexed { i, name ->
                             Column(
-                                Modifier.width(46.dp),
+                                Modifier.weight(1f),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("${i + 1}", fontSize = 15.sp, color = Color(0xFFB0A7C6), fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.height(2.dp))
-                                Text(name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD166))
-                                Spacer(Modifier.height(2.dp))
+                                Text("${i + 1}", fontSize = 16.sp, color = Color(0xFFB0A7C6), fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(4.dp))
+                                Text(name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD166), maxLines = 1)
+                                Spacer(Modifier.height(4.dp))
                                 Text(MusicData.letters[i], fontSize = 14.sp, color = Color(0xFF7BC7FF), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text("钢琴白键从左到右就是 C D E F G A B 无限循环，越往右越高。", fontSize = 12.sp, color = Color(0xFF8888A0))
+                    Spacer(Modifier.height(10.dp))
+                    // 三行名字各是什么：数字、唱名、音名逐一说明（恢复 1.0 版本的讲解）
+                    Text(
+                        "三行分别是什么：\n" +
+                        "· 数字（简谱）：写谱用的 1 2 3 4 5 6 7，最方便快速记录；\n" +
+                        "· 唱名（怎么唱）：哆来咪发嗦拉西，是你嘴里唱出来的名字；\n" +
+                        "· 音名（身份证）：C D E F G A B，是每个音固定不变的官方名字。",
+                        fontSize = 12.sp, color = Color(0xFF9A92B8), lineHeight = 19.sp
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "三者一一对应：1=C、2=D、3=E、4=F、5=G、6=A、7=B（以 1=C 的 C 大调为准）。看到任何一个数字、汉字或字母，都要能立刻报出另外两个。",
+                        fontSize = 12.sp, color = Color(0xFF8888A0), lineHeight = 19.sp
+                    )
                 }
             }
         }
-        items(MusicData.lessons) { lesson ->
-            var open by remember { mutableStateOf(false) }
+        itemsIndexed(MusicData.lessons) { _, lesson ->
+            var open by rememberSaveable(lesson.title) { mutableStateOf(false) }
             Card(
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth().clickable { open = !open }

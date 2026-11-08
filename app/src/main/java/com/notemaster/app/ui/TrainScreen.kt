@@ -171,11 +171,12 @@ private fun NameQuiz(prefs: SharedPreferences?) {
 
 @Composable
 private fun EchoGame() {
-    var seq by remember { mutableStateOf(listOf<Int>()) }
-    var phase by remember { mutableStateOf("idle") } // idle / listen / input
-    var input by remember { mutableStateOf(listOf<Int>()) }
-    var feedback by remember { mutableStateOf("选择难度开始，先听旋律，再在键盘上复现") }
-    var highlight by remember { mutableStateOf(-1) }
+    // 切走再切回不丢进度：全部状态用 rememberSaveable 保存
+    var seq by rememberSaveable { mutableStateOf(listOf<Int>()) }
+    var phase by rememberSaveable { mutableStateOf("idle") } // idle / listen / input
+    var input by rememberSaveable { mutableStateOf(listOf<Int>()) }
+    var feedback by rememberSaveable { mutableStateOf("选择难度开始，先听旋律，再在键盘上复现") }
+    var highlight by rememberSaveable { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
 
     fun playSeq(s: List<Int>, done: () -> Unit) {
