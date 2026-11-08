@@ -324,10 +324,10 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
                                 MusicData.displayToken(n),
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (lit) Color(0xFFFFD166) else if (active) Color.White else Color(0xFF7BC7FF),
+                                color = if (lit) Color(0xFF2A2244) else if (active) Color.White else Color(0xFF7BC7FF),
                                 modifier = Modifier
                                     .background(
-                                        if (lit) Color(0xFF6750A4) else Color.Transparent,
+                                        if (lit) Color(0xFFFFD166) else Color.Transparent,
                                         RoundedCornerShape(6.dp)
                                     )
                                     .padding(horizontal = 4.dp)

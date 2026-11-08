@@ -46,7 +46,7 @@ fun LearnScreen() {
         item {
             Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E))) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("核心对照表（背到脱口而出）", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("核心对照表（背到脱口而出）", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
                     Spacer(Modifier.height(10.dp))
                     // 7 列等宽自适应：数字 / 唱名 / 音名 一一竖向对齐，保证第 7 列不被裁剪
                     Row(Modifier.fillMaxWidth()) {

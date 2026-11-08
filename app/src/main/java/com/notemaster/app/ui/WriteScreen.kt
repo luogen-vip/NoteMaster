@@ -66,7 +66,7 @@ private fun ChordSection() {
 
     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp)) {
-            Text("🎸 万能和弦进行", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text("🎸 万能和弦进行", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Color.White)
             Spacer(Modifier.height(8.dp))
             MusicData.chordProgs.forEach { prog ->
                 val active = activeProg == prog.name
@@ -130,13 +130,14 @@ private fun ComposerSection(onFeedback: (String) -> Unit) {
     // 八格旋律：用字符串保存，切页不丢；oct 为统一八度
     var gridStr by rememberSaveable { mutableStateOf("1 2 3 4 5 6 7 1") }
     var oct by rememberSaveable { mutableIntStateOf(0) }
+    var auditioning by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val steps = remember(gridStr) { gridStr.split(" ").map { it.toIntOrNull() ?: 1 } }
 
     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp)) {
-            Text("🎹 八格旋律创作板", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text("🎹 八格旋律创作板", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Color.White)
             Spacer(Modifier.height(4.dp))
             Text(
                 "点格子换音（数字 1-7 → 哆来咪发嗦拉西，8=休止）。写完点试听。",
@@ -183,19 +184,28 @@ private fun ComposerSection(onFeedback: (String) -> Unit) {
             Spacer(Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    scope.launch {
-                        for (step in steps) {
-                            if (step != 8) TonePlayer.play(MusicData.stepToFreq(step, oct), 500)
-                            delay(550)
+                Button(
+                    onClick = {
+                        if (auditioning) return@Button
+                        auditioning = true
+                        scope.launch {
+                            for (step in steps) {
+                                if (step != 8) TonePlayer.play(MusicData.stepToFreq(step, oct), 500)
+                                delay(550)
+                            }
+                            auditioning = false
                         }
-                    }
-                    onFeedback(
-                        if (steps.none { it == 8 })
-                            "🎵 好旋律秘诀：开头和结尾落在 1 或 5 上最稳"
-                        else "🎵 休止符也是音乐的一部分"
+                        onFeedback(
+                            if (steps.none { it == 8 })
+                                "🎵 好旋律秘诀：开头和结尾落在 1 或 5 上最稳"
+                            else "🎵 休止符也是音乐的一部分"
+                        )
+                    },
+                    enabled = !auditioning,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (auditioning) Color(0xFF7C4DFF) else MaterialTheme.colorScheme.primary
                     )
-                }) { Text("▶ 试听") }
+                ) { Text(if (auditioning) "❚❚ 试听中" else "▶ 试听") }
                 Button(onClick = {
                     gridStr = List(8) { (1..7).random() }.joinToString(" ")
                     onFeedback("🎲 已随机生成，试试听，说不定有惊喜")

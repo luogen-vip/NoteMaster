@@ -57,9 +57,8 @@ fun TrainScreen() {
     Column(
         Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-            .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("① 听音辨名", "② 音名反应", "③ 旋律跟读").forEachIndexed { i, label ->
@@ -71,7 +70,7 @@ fun TrainScreen() {
             }
         }
         Text(
-            "今日战绩：答对 $correctTotal 次 · 连击最高 $bestStreak",
+            "今日战绩：答对 $correctTotal 次 · 连击最高 $bestStreak（连续答对不中断）",
             fontSize = 13.sp, color = Color(0xFF9A92B8)
         )
         when (mode) {
@@ -126,9 +125,11 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
                 ) {
                     Text(if (isPlaying) "❚❚ 播放中…" else "▶ 播放", fontSize = 18.sp)
                 }
-                if (feedback.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(feedback, fontSize = 16.sp, color = Color(0xFFFFD166), fontWeight = FontWeight.Bold)
+                // 固定高度的反馈区：没答题时也占位，答完弹提示不会把页面往下挤
+                Box(Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+                    if (feedback.isNotEmpty()) {
+                        Text(feedback, fontSize = 16.sp, color = Color(0xFFFFD166), fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -156,7 +157,10 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
                 } }
             }
         }
-        Text("连击：$streak  🔥", fontSize = 15.sp, color = if (streak >= 5) Color(0xFFFF6B6B) else Color(0xFF9A92B8))
+        Text(
+            "连击：$streak  🔥（答错就清零，试试连续答对 5 个）",
+            fontSize = 15.sp, color = if (streak >= 5) Color(0xFFFF6B6B) else Color(0xFF9A92B8)
+        )
         Text(
             "小技巧：先在心里跟唱一遍，再选。答错时立刻重听一次，加深印象。",
             fontSize = 12.sp, color = Color(0xFF77718F)
@@ -199,7 +203,10 @@ private fun NameQuiz(record: (Boolean) -> Unit) {
                 ) { Text(name, fontSize = 15.sp) }
             }
         }
-        if (feedback.isNotEmpty()) Text(feedback, fontSize = 15.sp, color = Color(0xFFFFD166))
+        // 固定高度反馈区，避免提示出现时按钮上下跳动
+        Box(Modifier.height(22.dp)) {
+            if (feedback.isNotEmpty()) Text(feedback, fontSize = 15.sp, color = Color(0xFFFFD166))
+        }
         Text(
             "训练目标：看到字母 0.5 秒内脱口而出唱名。E→咪、G→嗦 是最容易混的，多刷。",
             fontSize = 12.sp, color = Color(0xFF77718F), lineHeight = 20.sp
