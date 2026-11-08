@@ -245,25 +245,35 @@ private fun EchoGame() {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // 难度按钮 + 重听：各占权重，大屏小屏都不会被挤变形；重听按钮写清楚文字
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(3 to "3 音", 5 to "5 音", 7 to "7 音").forEach { (len, label) ->
-                Button(onClick = {
-                    seq = List(len) { (1..7).random() }
-                    input = emptyList()
-                    feedback = "🔊 仔细听…"
-                    phase = "listen"
-                    playSeq(seq) {
-                        phase = "input"
-                        feedback = "轮到你了：把听到的按顺序弹出来"
-                    }
-                }) { Text(label) }
+                Button(
+                    onClick = {
+                        seq = List(len) { (1..7).random() }
+                        input = emptyList()
+                        feedback = "🔊 仔细听…"
+                        phase = "listen"
+                        playSeq(seq) {
+                            phase = "input"
+                            feedback = "轮到你了：把听到的按顺序弹出来"
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) { Text(label, maxLines = 1) }
             }
-            Button(onClick = {
-                if (seq.isNotEmpty()) {
-                    feedback = "🔊 再听一遍…"
-                    playSeq(seq) { feedback = "轮到你了：把听到的按顺序弹出来" }
-                }
-            }) { Text("↻ 重听") }
+            Button(
+                onClick = {
+                    if (seq.isNotEmpty()) {
+                        feedback = "🔊 再听一遍…"
+                        playSeq(seq) { feedback = "轮到你了：把听到的按顺序弹出来" }
+                    }
+                },
+                modifier = Modifier.weight(1.4f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) { Text("🔊 再听一遍", maxLines = 1) }
         }
         Text(feedback, fontSize = 15.sp, color = Color(0xFFFFD166))
         // 8 键键盘（1..7 + 高1）
@@ -313,7 +323,8 @@ private fun EchoGame() {
                 modifier = Modifier.weight(1f).height(70.dp),
                 contentPadding = PaddingValues(0.dp)
             ) { Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("哆", fontSize = 14.sp); Text("1̇", fontSize = 11.sp)
+                Text("高音哆", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("高1", fontSize = 11.sp)
             } }
         }
         Text(

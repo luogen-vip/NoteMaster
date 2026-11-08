@@ -3,6 +3,7 @@ package com.notemaster.app.audio
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.sin
@@ -10,20 +11,29 @@ import kotlin.math.sin
 /**
  * 内置钢琴音色合成器：无需任何音频素材，实时合成带泛音和衰减包络的音。
  * 支持滑音：freqEnd != freq 时，音高在时长内从 freq 连续滑到 freqEnd（下滑音效果）。
+ *
+ * 并发模型：每个音一条独立 AudioTrack，登记在 active 列表里；
+ * v1.6 的 bug 是新音被上一个未结束的音"误杀"（快弹时哑音、声音发怪），v1.7 修复：
+ *  - 新音永远正常发声，互不干扰；
+ *  - stopAll() 只用于离开页面，停掉当前所有在响的音。
  */
 object TonePlayer {
 
     private const val SAMPLE_RATE = 44100
 
-    /** 当前正在发声的轨道：切页/停止时立即掐断声音 */
-    @Volatile private var current: AudioTrack? = null
+    /** 当前所有在响的轨道 */
+    private val active = CopyOnWriteArrayList<AudioTrack>()
 
     /** 立即停止当前所有发声（离开页面时调用，避免切页后声音残留） */
     fun stopAll() {
-        val t = current
-        current = null
-        runCatching { t?.stop() }
-        runCatching { t?.release() }
+        for (t in active) {
+            runCatching { t.pause() }
+            runCatching { t.flush() }
+        }
+        for (t in active) {
+            runCatching { t.release() }
+        }
+        active.clear()
     }
 
     /** 播放一个音；freqEnd 不等于 freq 时做连续滑音 */
@@ -66,12 +76,11 @@ object TonePlayer {
                 .setBufferSizeInBytes(pcm.size * 2)
                 .build()
             track.write(pcm, 0, pcm.size)
-            // 若在合成期间已被 stopAll 掐断，就不要再发声了
-            if (current != null && current !== track) { runCatching { track.release() }; return@Thread }
-            current = track
+            active.add(track)
             track.play()
             Thread.sleep(durationMs.toLong() + 150)
-            if (current === track) current = null
+            // 播完自行收尾；若 stopAll 已释放过，重复释放会被 runCatching 兜住不崩溃
+            active.remove(track)
             runCatching { track.stop() }
             runCatching { track.release() }
         }.start()
