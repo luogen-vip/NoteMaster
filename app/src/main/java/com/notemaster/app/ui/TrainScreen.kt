@@ -223,7 +223,7 @@ private fun EchoGame() {
     // 切走再切回不丢进度：全部状态用 rememberSaveable 保存
     var seq by rememberSaveable { mutableStateOf(listOf<Int>()) }
     var phase by remember { mutableStateOf("idle") } // idle / listen / input（不跨页保存，避免回来卡在“听中”）
-    var input by rememberSaveable { mutableStateOf(listOf<Int>()) }
+    var progress by rememberSaveable { mutableIntStateOf(0) } // 已连对到第几个音（逐位判定）
     var feedback by rememberSaveable { mutableStateOf("选择难度开始，先听旋律，再在键盘上复现") }
     var highlight by rememberSaveable { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
@@ -232,15 +232,37 @@ private fun EchoGame() {
         onDispose { TonePlayer.stopAll() }
     }
 
+    // 旋律取值范围：1..7 中音 + 8 = 高音哆（键盘 8 个键都可能是答案，判定与琴键一一对应）
+    val stepFreq: (Int) -> Double = { if (it == 8) MusicData.stepToFreq(1, 1) else MusicData.stepToFreq(it, 0) }
+
     fun playSeq(s: List<Int>, done: () -> Unit) {
         scope.launch {
             for (n in s) {
                 highlight = n
-                TonePlayer.play(MusicData.stepToFreq(n, 0))
+                TonePlayer.play(stepFreq(n))
                 delay(520)
             }
             highlight = -1
             done()
+        }
+    }
+
+    // 逐位判定：第 progress+1 个音必须完全正确才算对；
+    // 弹错则明确提示「第几个弹错了，从头再来」并归零（逻辑透明，不会让人误会“点中答案里的音就算对”）
+    fun submitKey(n: Int) {
+        if (phase != "input" || seq.isEmpty()) return
+        if (n == seq[progress]) {
+            progress += 1
+            if (progress == seq.size) {
+                feedback = "🎉 全部 ${seq.size} 个音按顺序全对！你的耳朵升级了"
+                phase = "idle"
+                progress = 0
+            } else {
+                feedback = "✅ 第 ${progress} 个音对了（${progress}/${seq.size}），继续…"
+            }
+        } else {
+            feedback = "❌ 第 ${progress + 1} 个音弹错了，从头再来（进度已归零）"
+            progress = 0
         }
     }
 
@@ -250,8 +272,8 @@ private fun EchoGame() {
             listOf(3 to "3 音", 5 to "5 音", 7 to "7 音").forEach { (len, label) ->
                 Button(
                     onClick = {
-                        seq = List(len) { (1..7).random() }
-                        input = emptyList()
+                        seq = List(len) { (1..8).random() }
+                        progress = 0
                         feedback = "🔊 仔细听…"
                         phase = "listen"
                         playSeq(seq) {
@@ -276,26 +298,20 @@ private fun EchoGame() {
             ) { Text("🔊 再听一遍", maxLines = 1) }
         }
         Text(feedback, fontSize = 15.sp, color = Color(0xFFFFD166))
-        // 8 键键盘（1..7 + 高1）
+        // 进度圆点：● = 已连对，○ = 还没对；弹错归零后能直观看到从头开始
+        if (seq.isNotEmpty()) {
+            Text(
+                "进度：" + List(seq.size) { i -> if (i < progress) "●" else "○" }.joinToString(" "),
+                fontSize = 14.sp, color = Color(0xFF7BC7FF)
+            )
+        }
+        // 8 键键盘（1..7 + 高音哆）：高音哆也是合法答案，判定与琴键一一对应
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             (1..7).forEach { n ->
                 Button(
                     onClick = {
-                        if (phase == "input") {
-                            TonePlayer.play(MusicData.stepToFreq(n, 0))
-                            input = input + n
-                            val prefixOk = seq.take(input.size) == input
-                            if (!prefixOk) {
-                                feedback = "❌ 弹错了，重听一遍再来"
-                                input = emptyList()
-                            } else if (input.size == seq.size) {
-                                feedback = "🎉 完全正确！你的耳朵升级了"
-                                phase = "idle"
-                                input = emptyList()
-                            } else {
-                                feedback = "✅ 第 ${input.size} 个对了，继续…"
-                            }
-                        } else TonePlayer.play(MusicData.stepToFreq(n, 0))
+                        TonePlayer.play(stepFreq(n))
+                        submitKey(n)
                     },
                     modifier = Modifier.weight(1f).height(70.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -311,14 +327,8 @@ private fun EchoGame() {
             }
             Button(
                 onClick = {
-                    TonePlayer.play(MusicData.stepToFreq(1, 1))
-                    if (phase == "input") {
-                        input = input + 1
-                        val prefixOk = seq.take(input.size) == input
-                        if (!prefixOk) { feedback = "❌ 弹错了，重听一遍再来"; input = emptyList() }
-                        else if (input.size == seq.size) { feedback = "🎉 完全正确！你的耳朵升级了"; phase = "idle"; input = emptyList() }
-                        else feedback = "✅ 第 ${input.size} 个对了，继续…"
-                    }
+                    TonePlayer.play(stepFreq(8))
+                    submitKey(8)
                 },
                 modifier = Modifier.weight(1f).height(70.dp),
                 contentPadding = PaddingValues(0.dp)
@@ -328,7 +338,7 @@ private fun EchoGame() {
             } }
         }
         Text(
-            "这是「听出旋律」的核心训练：听久了你就能像记住歌词一样记住音。",
+            "这是「听出旋律」的核心训练：必须按顺序逐个对上，第几个音错了都会从头再来。听久了你就能像记住歌词一样记住音。",
             fontSize = 12.sp, color = Color(0xFF77718F), lineHeight = 20.sp
         )
     }
