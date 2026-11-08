@@ -1,20 +1,29 @@
 package com.notemaster.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,6 +81,7 @@ fun SongsScreen() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
     var playing by rememberSaveable { mutableStateOf(false) }
@@ -112,7 +122,10 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
                     val n = notes[ni]
                     activeNote = ni
                     val freq = MusicData.stepToFreq(n.step, n.octave)
-                    if (freq > 0) TonePlayer.play(freq, (n.beats * beatMs * 0.9f).toInt())
+                    // 下滑音：尾音从本音滑到下一个音级（如 6→5），模拟原唱尾音下坠
+                    val freqEnd = if (n.slide < 0 && n.step > 1)
+                        MusicData.stepToFreq(n.step - 1, n.octave) else freq
+                    if (freq > 0) TonePlayer.play(freq, (n.beats * beatMs * 0.9f).toInt(), 0.8, freqEnd)
                     delay((n.beats * beatMs).toLong())
                 }
                 // 逐句跟读模式句间停顿帮助消化；原速模式不停顿，保持原曲连续性
@@ -178,6 +191,43 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
             modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
         )
 
+        // ★ 正在播放面板：固定在歌词上方，一眼看到播到哪句、哪个音
+        if (playing && activeLine >= 0) {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF3A2F63)),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            ) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "♪ 正在播放 第${activeLine + 1}/${song.lines.size}句",
+                            fontSize = 11.sp, color = Color(0xFF7BC7FF)
+                        )
+                        Spacer(Modifier.weight(1f))
+                        if (activeNote >= 0 && activeNote < noteLines[activeLine].size) {
+                            Text(
+                                MusicData.displayToken(noteLines[activeLine][activeNote]),
+                                fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFD166)
+                            )
+                        }
+                    }
+                    Text(
+                        song.lines[activeLine].lyric,
+                        fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                        color = Color.White, maxLines = 1
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { (activeLine + 1f) / song.lines.size },
+                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
+                        color = Color(0xFFFFD166), trackColor = Color(0xFF52447F)
+                    )
+                }
+            }
+        }
+
         // 歌词 + 数字谱：占据剩余全部空间，能看到多句歌词并自由滑动
         LazyColumn(
             state = listState,
@@ -193,6 +243,11 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
                             if (active) Color(0xFF3A2F63) else Color.Transparent,
                             RoundedCornerShape(10.dp)
                         )
+                        .then(
+                            if (active) Modifier.border(
+                                2.dp, Color(0xFFFFD166), RoundedCornerShape(10.dp)
+                            ) else Modifier
+                        )
                         .clickable { stop(); start(li) }
                         .padding(10.dp)
                 ) {
@@ -203,8 +258,9 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
                         color = if (active) Color(0xFFFFD166) else Color(0xFFDDD6EE)
                     )
                     Spacer(Modifier.height(6.dp))
-                    // 逐音数字谱：播放到哪个音就点亮哪个
-                    Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    // 逐音数字谱：自动换行，全部音符始终可见，不再横向裁剪；
+                    // 播放到哪个音就点亮哪个
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         noteLines[li].forEachIndexed { ni, n ->
                             val lit = active && ni == activeNote
                             Text(
@@ -213,7 +269,6 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
                                 fontWeight = FontWeight.Bold,
                                 color = if (lit) Color(0xFFFFD166) else if (active) Color.White else Color(0xFF7BC7FF),
                                 modifier = Modifier
-                                    .padding(end = 8.dp)
                                     .background(
                                         if (lit) Color(0xFF6750A4) else Color.Transparent,
                                         RoundedCornerShape(6.dp)

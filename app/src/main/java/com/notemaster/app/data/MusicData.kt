@@ -8,7 +8,8 @@ package com.notemaster.app.data
 data class JpNote(
     val step: Int,        // 1..7 = do..si；0 = 休止
     val octave: Int,      // 0 中音区，+1 高音，-1 低音
-    var beats: Float      // 拍数
+    var beats: Float,     // 拍数
+    val slide: Int = 0    // 下滑音：-1 = 向下滑一个音级（如 6→5），0 = 不滑
 )
 
 object MusicData {
@@ -25,7 +26,7 @@ object MusicData {
         return C4_FREQ * Math.pow(2.0, semi / 12.0)
     }
 
-    /** 显示用数字谱标记：高音加 ′，低音加 _，长音加 - */
+    /** 显示用数字谱标记：高音加 ′，低音加 _，下滑音加 ↓，长音加 - */
     fun displayToken(n: JpNote): String {
         val core = when {
             n.step == 0 -> "0"
@@ -33,7 +34,8 @@ object MusicData {
             n.octave < 0 -> "_${n.step}_"
             else -> "${n.step}"
         }
-        return core + "-".repeat((n.beats - 1).toInt().coerceAtLeast(0))
+        val slideMark = if (n.slide < 0) "↓" else ""
+        return core + slideMark + "-".repeat((n.beats - 1).toInt().coerceAtLeast(0))
     }
 
     /** 解析简谱字符串为音符列表 */
@@ -54,7 +56,9 @@ object MusicData {
                         if (t.contains('^') || t.contains('+') || t.contains('′') || t.contains('̇')) oct = 1
                         // 低音记号：_ 下划线
                         if (t.contains('_')) oct = -1
-                        notes.add(JpNote(step, oct, 1f))
+                        // 下滑音记号：↓ 向下滑一个音级（模拟原唱尾音下坠，如『雨』6→5）
+                        val slide = if (t.contains('↓') || t.contains('v')) -1 else 0
+                        notes.add(JpNote(step, oct, 1f, slide))
                     }
                 }
             }
@@ -219,48 +223,65 @@ C 调：自然舒服 | G 调：清亮 | D 调：干净 | A 调：抒情
         )
     )
 
-    // ---------------- 歌曲示例（1=C 相对唱名，旋律与 BPM 均对照公开发布的权威简谱校准） ----------------
-    // noteBeats：原曲中一个字平均占的拍数（如 0.5 = 八分音符）。原速播放按 bpm × noteBeats 精确还原原曲字速。
+    // ---------------- 歌曲示例（1=C 相对唱名） ----------------
+    // 简谱逐句对照权威制谱校准八度与旋律（青花瓷：jianpu.space 精确八度版；
+    // 童话：光良官方流传谱；童话镇：陶笛谱低音点标注；可不可以：苍强制谱 1=bD）。
+    // noteBeats：原曲中一个字平均占的拍数。原速播放 = bpm × noteBeats，还原发行字速。
+    // "↓" = 下滑音：尾音向下滑一个音级，模拟原唱的尾音下坠（如『烟雨』的『雨』）。
     data class SongLine(val lyric: String, val melody: String)
     data class Song(val title: String, val artist: String, val bpm: Int, val note: String,
                     val noteBeats: Float = 1f, val lines: List<SongLine>)
 
     val songs = listOf(
-        Song("青花瓷", "周杰伦", 108, "简谱已对照原曲校准（原曲 BPM 108）· 1=C（原调A，记谱为相对唱名）", 0.5f, listOf(
-            SongLine("天青色等烟雨", "5 5 3 2 3 6 - -"),
-            SongLine("而我在等你", "2 3 5 3 2 - - -"),
-            SongLine("炊烟袅袅升起", "5 5 3 2 3 5 - -"),
-            SongLine("隔江千万里", "2 3 5 2 1 - - -"),
+        Song("青花瓷", "周杰伦", 108, "简谱已对照权威制谱校准（原曲 BPM 108）· 1=C（原调A，记谱为相对唱名）· 低音加_，下滑音加↓", 0.75f, listOf(
+            SongLine("素胚勾勒出青花笔锋浓转淡", "2 1 _6_ 1 1 _6_ 1 1 _6_ 1 _6_ _5_"),
+            SongLine("瓶身描绘的牡丹一如你初妆", "2 1 _6_ 1 1 _6_ 1 1 3 2 1 1"),
+            SongLine("冉冉檀香透过窗心事我了然", "5 6 3 3 3 2 3 3 2 3 5 3"),
+            SongLine("宣纸上走笔至此搁一半", "3 3 3 2 2 2 2 2 1 3 2"),
+            SongLine("釉色渲染仕女图韵味被私藏", "2 1 _6_ 1 1 _6_ 1 1 _6_ 1 _6_ _5_"),
+            SongLine("而你嫣然的一笑如含苞待放", "5 6 3 5 5 3 5 5 3 2 1 1"),
+            SongLine("你的美一缕飘散", "2 1 2 3 2 2 1 2"),
+            SongLine("去到我去不了的地方", "1 _6_ 2 1 1 _6_ 1 1 1"),
+            SongLine("天青色等烟雨", "5 5 3 2 3 _6_↓ -"),
+            SongLine("而我在等你", "2 3 5 3 2 - -"),
+            SongLine("炊烟袅袅升起", "5 5 3 2 3 _5_ -"),
+            SongLine("隔江千万里", "2 3 5 2 1 - -"),
             SongLine("在瓶底书汉隶仿前朝的飘逸", "1 2 3 5 6 5 3 5 3 3 2 2 -"),
             SongLine("就当我为遇见你伏笔", "1 2 1 2 1 2 3 5 3 -"),
-            SongLine("月色被打捞起", "5 5 3 2 3 6 - -"),
-            SongLine("晕开了结局", "2 3 5 3 2 - - -"),
+            SongLine("月色被打捞起", "5 5 3 2 3 _5_ -"),
+            SongLine("晕开了结局", "2 3 5 2 1 - -"),
             SongLine("如传世的青花瓷自顾自美丽", "1 2 3 5 6 5 3 5 3 3 2 2 -"),
-            SongLine("你眼带笑意", "5 3 2 2 1 - -")
+            SongLine("你眼带笑意", "5 3 2 2 1 -")
         )),
-        Song("童话", "光良", 72, "简谱已对照原曲校准（原曲 BPM 72）· 1=C · _7 为低音西", 0.5f, listOf(
+        Song("童话", "光良", 72, "简谱已对照权威制谱校准（原曲 BPM 72）· 1=C · _7_ 为低音西", 1f, listOf(
+            SongLine("忘了有多久", "5 1 _7_ 1 _5_"),
+            SongLine("再没听到你", "5 1 _7_ 1 _5_"),
+            SongLine("对我说你最爱的故事", "5 1 _7_ 1 1 1 _6_ _6_ _5_"),
+            SongLine("我想了很久", "5 1 _7_ 1 _5_"),
+            SongLine("我开始慌了", "5 3 2 2 1"),
+            SongLine("是不是我又做错了什么", "5 1 _7_ _6_ _6_ 1 1 _6_ _5_"),
             SongLine("你哭着对我说", "2 2 4 4 3 3 - -"),
-            SongLine("童话里都是骗人的", "3 3 _7 2 1 1 _7 1 -"),
-            SongLine("我不可能是你的王子", "1 _7 1 4 5 5 4 3 2 - -"),
-            SongLine("也许你不会懂", "2 2 4 4 3 3 - -"),
-            SongLine("从你说爱我以后", "3 3 _7 _7 6 _7 1 -"),
+            SongLine("童话里都是骗人的", "3 3 _7_ 2 1 1 _7_ 1 -"),
+            SongLine("我不可能是你的王子", "1 _7_ 1 4 5 5 4 3 2 - -"),
+            SongLine("也许你不会懂", "2 2 4 4 3 3 -"),
+            SongLine("从你说爱我以后", "3 3 _7_ _7_ 6 _7_ 1 -"),
             SongLine("我的天空星星都亮了", "1 3 2 1 6 6 6 5 5 - -")
         )),
-        Song("童话镇", "陈一发儿", 70, "简谱已对照原曲校准（原曲 BPM 70）· 1=C", 0.5f, listOf(
-            SongLine("听说白雪公主在逃跑", "4 3 4 3 2 6 5 5 -"),
-            SongLine("小红帽在担心大灰狼", "4 3 4 3 2 3 6 6 -"),
-            SongLine("听说疯帽喜欢爱丽丝", "4 3 4 3 2 6 1 1 -"),
-            SongLine("丑小鸭会变成白天鹅", "5 4 5 4 5 4 3 3 -"),
-            SongLine("听说彼得潘总长不大", "4 3 4 3 2 6 5 5 -"),
-            SongLine("杰克他有竖琴和魔法", "4 3 4 3 2 3 6 6 -")
+        Song("童话镇", "陈一发儿", 78, "简谱已对照权威制谱校准（原曲 BPM 78）· 1=C · 主歌在低音区，_下划线_=低音", 0.5f, listOf(
+            SongLine("听说白雪公主在逃跑", "4 3 4 3 _2_ _6_ _5_ _5_ -"),
+            SongLine("小红帽在担心大灰狼", "4 3 4 3 _2_ _3_ _6_ _6_ -"),
+            SongLine("听说疯帽喜欢爱丽丝", "4 3 4 3 _2_ _6_ _1_ _1_ -"),
+            SongLine("丑小鸭会变成白天鹅", "5 4 5 4 5 _4_ _3_ _3_ -"),
+            SongLine("听说彼得潘总长不大", "4 3 4 3 _2_ _6_ _5_ _5_ -"),
+            SongLine("杰克他有竖琴和魔法", "4 3 4 3 _2_ _3_ _6_ _6_ -")
         )),
-        Song("可不可以", "张紫豪", 67, "简谱已对照原曲校准（原曲 BPM 67）· 1=C", 0.5f, listOf(
-            SongLine("可不可以", "6 6 3 -"),
-            SongLine("和你在一起", "6 3 2′ 3 2 1 -"),
-            SongLine("我们之间有太多回忆", "5 3 5 2 2 1 3 2 1 6 -"),
-            SongLine("爱上了你没什么道理", "6 6 4 6 3 2 1 2 5 2 -"),
-            SongLine("可不可以", "6 6 3 -"),
-            SongLine("就这样和你在一起", "6 3 2′ 3 2 1 -")
+        Song("可不可以", "张紫豪", 68, "简谱已对照权威制谱校准（原调bD，原曲 BPM 68）· 1=C · 副歌在低音区", 0.5f, listOf(
+            SongLine("可不可以", "5 3 5 _3_ -"),
+            SongLine("和你在一起", "_2_ _3_ _2_ _1_ 5 -"),
+            SongLine("我们之间有太多回忆", "5 3 5 _2_ _2_ _1_ _3_ _2_ _1_ 5 -"),
+            SongLine("爱上了你没什么道理", "5 4 5 _3_ _1_ _1_ _2_ 5 _2_ -"),
+            SongLine("可不可以", "5 3 5 _3_ -"),
+            SongLine("就这样和你在一起", "_2_ _3_ _2_ _1_ 5 -")
         )),
         Song("小星星", "经典练习曲", 90, "1=C · 入门必练（BPM 90，一音一拍）", 1f, listOf(
             SongLine("一闪一闪亮晶晶", "1 1 5 5 6 6 5 - -"),
@@ -270,12 +291,12 @@ C 调：自然舒服 | G 调：清亮 | D 调：干净 | A 调：抒情
             SongLine("一闪一闪亮晶晶", "1 1 5 5 6 6 5 - -"),
             SongLine("满天都是小星星", "4 4 3 3 2 2 1 - -")
         )),
-        Song("两只老虎", "经典练习曲", 120, "1=C · 音程训练（1→3 大三度，BPM 120）", 0.5f, listOf(
-            SongLine("两只老虎", "1 2 3 1 1 2 3 1"),
-            SongLine("两只老虎", "1 2 3 1 1 2 3 1"),
+        Song("两只老虎", "经典练习曲", 120, "1=C · 音程训练（1→3 大三度，BPM 120，一音一拍）", 1f, listOf(
+            SongLine("两只老虎", "1 2 3 1 - 1 2 3 1 -"),
+            SongLine("两只老虎", "1 2 3 1 - 1 2 3 1 -"),
             SongLine("跑得快", "3 4 5 - 3 4 5 -"),
             SongLine("跑得快", "3 4 5 - 3 4 5 -"),
-            SongLine("一只没有眼睛", "5 6 5 4 3 1 5 6 5 4 3 1"),
+            SongLine("一只没有眼睛", "5 6 5 4 3 1 - 5 6 5 4 3 1 -"),
             SongLine("一只没有尾巴", "5 _2_ 5 1 - 5 _2_ 5 1 -"),
             SongLine("真奇怪", "1 5 1 - - 1 5 1 - -")
         ))
