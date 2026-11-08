@@ -316,7 +316,11 @@ private fun EchoGame() {
                     // 正在播旋律时不重复触发，避免两遍重叠
                     if (seq.isEmpty() || phase == "listen") return@Button
                     feedback = "🔊 再听一遍…"
-                    playSeq(seq) { feedback = "轮到你了：把听到的按顺序弹出来" }
+                    playSeq(seq) {
+                        // 重播完必须恢复到「输入中」，否则（比如弹错归零后）点琴键不会被判定
+                        phase = "input"
+                        feedback = "轮到你了：把听到的按顺序弹出来"
+                    }
                 },
                 modifier = Modifier.weight(1.4f),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
