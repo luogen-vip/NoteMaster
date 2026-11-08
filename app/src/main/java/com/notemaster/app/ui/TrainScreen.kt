@@ -101,6 +101,8 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
     var streak by rememberSaveable { mutableIntStateOf(0) }
     // 播放态不跨页保存：切走再回来=未播放，不会卡在「播放中」且按钮不可点
     var isPlaying by remember { mutableStateOf(false) }
+    // 答题锁定：出结果后的 0.9 秒过渡期内不可再答，防止连点同一题重复计战绩/连击
+    var answering by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
@@ -142,6 +144,8 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
             MusicData.solfege.forEachIndexed { idx, name ->
                 Button(
                     onClick = {
+                        if (answering) return@Button
+                        answering = true
                         val ok = idx + 1 == step
                         feedback = if (ok) "✅ 对！是 $name" else "❌ 是 ${MusicData.solfege[step - 1]}，再听一次"
                         record(ok)
@@ -150,6 +154,7 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
                             delay(900)
                             step = deck.draw()   // 洗牌轮换：7 个音每轮各出现一次
                             feedback = ""
+                            answering = false
                         }
                     },
                     modifier = Modifier.weight(1f).height(56.dp),
@@ -177,6 +182,8 @@ private fun NameQuiz(record: (Boolean) -> Unit) {
     val deck = remember { NoteDeck() }
     var letter by rememberSaveable { mutableStateOf(MusicData.letters[deck.draw() - 1]) }
     var feedback by rememberSaveable { mutableStateOf("") }
+    // 答题锁定：0.7 秒过渡期内不可再答，防止连点重复计分
+    var answering by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -191,6 +198,8 @@ private fun NameQuiz(record: (Boolean) -> Unit) {
             MusicData.solfege.forEachIndexed { idx, name ->
                 Button(
                     onClick = {
+                        if (answering) return@Button
+                        answering = true
                         val target = MusicData.letters.indexOf(letter) + 1
                         val ok = idx + 1 == target
                         feedback = if (ok) "✅ $letter = $name = ${target}" else "❌ $letter = ${MusicData.solfege[target - 1]}"
@@ -199,6 +208,7 @@ private fun NameQuiz(record: (Boolean) -> Unit) {
                             delay(700)
                             letter = MusicData.letters[deck.draw() - 1]   // 洗牌轮换，A~B 都会出现
                             feedback = ""
+                            answering = false
                         }
                     },
                     modifier = Modifier.weight(1f).height(52.dp),
@@ -261,8 +271,14 @@ private fun EchoGame() {
                 feedback = "✅ 第 ${progress} 个音对了（${progress}/${seq.size}），继续…"
             }
         } else {
-            feedback = "❌ 第 ${progress + 1} 个音弹错了，从头再来（进度已归零）"
+            // 弹错：归零并自动重播旋律，听完才能再输入——禁止闭眼盲猜，逻辑闭环：听→弹→错→重听→再弹
+            feedback = "❌ 第 ${progress + 1} 个音弹错了，已归零——重新听一遍旋律"
             progress = 0
+            phase = "listen"
+            playSeq(seq) {
+                phase = "input"
+                feedback = "轮到你了：从第 1 个音开始"
+            }
         }
     }
 
@@ -272,6 +288,8 @@ private fun EchoGame() {
             listOf(3 to "3 音", 5 to "5 音", 7 to "7 音").forEach { (len, label) ->
                 Button(
                     onClick = {
+                        // 正在播旋律时不接受重新开始/换难度，避免两次播放重叠打架
+                        if (phase == "listen") return@Button
                         seq = List(len) { (1..8).random() }
                         progress = 0
                         feedback = "🔊 仔细听…"
@@ -287,10 +305,10 @@ private fun EchoGame() {
             }
             Button(
                 onClick = {
-                    if (seq.isNotEmpty()) {
-                        feedback = "🔊 再听一遍…"
-                        playSeq(seq) { feedback = "轮到你了：把听到的按顺序弹出来" }
-                    }
+                    // 正在播旋律时不重复触发，避免两遍重叠
+                    if (seq.isEmpty() || phase == "listen") return@Button
+                    feedback = "🔊 再听一遍…"
+                    playSeq(seq) { feedback = "轮到你了：把听到的按顺序弹出来" }
                 },
                 modifier = Modifier.weight(1.4f),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6750A4)),
@@ -338,7 +356,7 @@ private fun EchoGame() {
             } }
         }
         Text(
-            "这是「听出旋律」的核心训练：必须按顺序逐个对上，第几个音错了都会从头再来。听久了你就能像记住歌词一样记住音。",
+            "这是「听出旋律」的核心训练：必须按顺序逐个对上；弹错会自动重播旋律，听完再从第 1 个音重新弹。听久了你就能像记住歌词一样记住音。",
             fontSize = 12.sp, color = Color(0xFF77718F), lineHeight = 20.sp
         )
     }
