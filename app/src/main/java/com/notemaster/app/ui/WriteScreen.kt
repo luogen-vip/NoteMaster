@@ -96,6 +96,11 @@ private fun ChordSection() {
                                 playJob = scope.launch {
                                     var loop = 0
                                     while (loop < 2) {
+                                        // 第一遍全部播完后：先清掉高亮，再停顿一下，让用户明确感知「一遍读完、马上重播」
+                                        if (loop > 0) {
+                                            activeIdx = -1
+                                            delay(700)
+                                        }
                                         prog.roots.forEachIndexed { i, root ->
                                             activeIdx = i
                                             val notes = MusicData.chordNotes(root, MusicData.isMinorChord(root))

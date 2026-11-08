@@ -9,7 +9,10 @@
         android:theme="@style/Theme.NoteMaster">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|density|uiMode|fontScale">
+            <!-- 上滑小窗/分屏/转屏时窗口尺寸变化，默认会重建 Activity 导致播放状态丢失、声音停止；
+                 加 configChanges 后由应用自行消化尺寸变化，Activity 不重建，正在播放的歌曲/试听原样继续。 -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
