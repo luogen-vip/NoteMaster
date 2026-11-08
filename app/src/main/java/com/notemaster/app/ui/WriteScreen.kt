@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 fun WriteScreen() {
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Text("✍️ 写歌工坊", fontSize = 22.sp, FontWeight.Bold)
+            Text("✍️ 写歌工坊", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
                 "第一步：选一个和弦进行循环播放，跟着哼；第二步：在创作板把你哼出来的音记下来并试听。",
@@ -177,7 +177,7 @@ private fun ComposerSection() {
                             delay(550)
                         }
                     }
-                    feedback = if (grid.none { it.step == 0 }) "🎵 好旋律秘诀：开头和结尾落在 1 或 5 上最稳"
+                    feedback = if (grid.none { it.first == 0 }) "🎵 好旋律秘诀：开头和结尾落在 1 或 5 上最稳"
                     else "🎵 休止符也是音乐的一部分"
                 }) { Text("▶ 试听") }
                 Button(onClick = {
