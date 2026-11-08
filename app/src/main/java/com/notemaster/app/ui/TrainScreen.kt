@@ -361,6 +361,10 @@ private fun EchoGame() {
                     submitKey(8)
                 },
                 modifier = Modifier.weight(1f).height(70.dp),
+                // 演示旋律时高音哆也要亮：旋律含高音哆，只出声不亮会让用户数不清音落在哪个键上
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (highlight == 8) Color(0xFFFFD166) else MaterialTheme.colorScheme.primary
+                ),
                 contentPadding = PaddingValues(0.dp)
             ) { Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("高音哆", fontSize = 13.sp, fontWeight = FontWeight.Bold)
