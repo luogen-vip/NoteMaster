@@ -15,6 +15,17 @@ object TonePlayer {
 
     private const val SAMPLE_RATE = 44100
 
+    /** 当前正在发声的轨道：切页/停止时立即掐断声音 */
+    @Volatile private var current: AudioTrack? = null
+
+    /** 立即停止当前所有发声（离开页面时调用，避免切页后声音残留） */
+    fun stopAll() {
+        val t = current
+        current = null
+        runCatching { t?.stop() }
+        runCatching { t?.release() }
+    }
+
     /** 播放一个音；freqEnd 不等于 freq 时做连续滑音 */
     fun play(freq: Double, durationMs: Int = 600, volume: Double = 0.8, freqEnd: Double = freq) {
         if (freq <= 0.0) return
@@ -55,10 +66,14 @@ object TonePlayer {
                 .setBufferSizeInBytes(pcm.size * 2)
                 .build()
             track.write(pcm, 0, pcm.size)
+            // 若在合成期间已被 stopAll 掐断，就不要再发声了
+            if (current != null && current !== track) { runCatching { track.release() }; return@Thread }
+            current = track
             track.play()
             Thread.sleep(durationMs.toLong() + 150)
-            track.stop()
-            track.release()
+            if (current === track) current = null
+            runCatching { track.stop() }
+            runCatching { track.release() }
         }.start()
     }
 }

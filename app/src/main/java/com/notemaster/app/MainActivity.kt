@@ -9,8 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.navigation.compose.*
 import com.notemaster.app.ui.*
 
@@ -18,8 +21,16 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            // 关键修复：忽略系统「超大字体」设置（封顶 1.0）。
+            // 用户开了大字体后，固定宽度的按钮行会把「停止/随机灵感」等按钮
+            // 挤成细竖条或圆形（文字完全挤没），底部导航也会折行。封顶后全 App 布局恢复稳定。
+            val d = LocalDensity.current
             MaterialTheme(colorScheme = darkColorScheme()) {
-                AppRoot()
+                CompositionLocalProvider(
+                    LocalDensity provides Density(d.density, fontScale = minOf(d.fontScale, 1.0f))
+                ) {
+                    AppRoot()
+                }
             }
         }
     }

@@ -24,20 +24,12 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun WriteScreen() {
-    // 用 Saver 保存滚动位置：切走再切回，停在哪里就还在哪里，不再自动跳回八格创作板
+    // 用 Saver 保存滚动位置：切走再切回，停在哪里就还在哪里
     val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
     var feedback by rememberSaveable { mutableStateOf("") }
 
-    // 记录上一次的反馈内容：只有反馈真正变化时才自动滚动，
-    // 否则切走再切回页面会重新触发 LaunchedEffect，把页面强拉到八格创作板
-    var lastFeedback by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(feedback) {
-        if (feedback.isNotEmpty() && feedback != lastFeedback) {
-            lastFeedback = feedback
-            kotlinx.coroutines.delay(200)
-            runCatching { listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
-        }
-    }
+    // 注意：不再自动滚动。之前的「反馈变化就滚到页尾」逻辑会在点随机灵感/试听时
+    // 把页面突然拉下去一截（用户看到的『页面上跳』），已删除。
 
     LazyColumn(
         Modifier.fillMaxSize().padding(16.dp),
@@ -61,8 +53,15 @@ fun WriteScreen() {
 private fun ChordSection() {
     var playJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var activeIdx by remember { mutableIntStateOf(-1) }
-    var activeProg by rememberSaveable { mutableStateOf("") }
+    var activeProg by remember { mutableStateOf("") }   // 不跨页保存：切走再回来=未播放
     val scope = rememberCoroutineScope()
+
+    DisposableEffect(Unit) {
+        onDispose {
+            playJob?.cancel()
+            TonePlayer.stopAll()
+        }
+    }
 
     Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp)) {
@@ -130,8 +129,16 @@ private fun ComposerSection(onFeedback: (String) -> Unit) {
     // 八格旋律：用字符串保存，切页不丢；oct 为统一八度
     var gridStr by rememberSaveable { mutableStateOf("1 2 3 4 5 6 7 1") }
     var oct by rememberSaveable { mutableIntStateOf(0) }
-    var auditioning by rememberSaveable { mutableStateOf(false) }
+    // 试听态不跨页保存：切走再回来=未播放，不会卡在「试听中」且按钮不可点
+    var auditioning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    DisposableEffect(Unit) {
+        onDispose {
+            // rememberCoroutineScope 离开组合时已自动取消协程，这里只需掉声音
+            TonePlayer.stopAll()
+        }
+    }
 
     val steps = remember(gridStr) { gridStr.split(" ").map { it.toIntOrNull() ?: 1 } }
 
@@ -176,14 +183,15 @@ private fun ComposerSection(onFeedback: (String) -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = oct == 0, onClick = { oct = 0 }, label = { Text("中音区") })
-                FilterChip(selected = oct == 1, onClick = { oct = 1 }, label = { Text("高音区") })
-                FilterChip(selected = oct == -1, onClick = { oct = -1 }, label = { Text("低音区") })
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(modifier = Modifier.weight(1f), selected = oct == 0, onClick = { oct = 0 }, label = { Text("中音区", maxLines = 1) })
+                FilterChip(modifier = Modifier.weight(1f), selected = oct == 1, onClick = { oct = 1 }, label = { Text("高音区", maxLines = 1) })
+                FilterChip(modifier = Modifier.weight(1f), selected = oct == -1, onClick = { oct = -1 }, label = { Text("低音区", maxLines = 1) })
             }
             Spacer(Modifier.height(8.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // 三个按钮各占 2:2:1 权重，大字体下也互相不会被挤变形
                 Button(
                     onClick = {
                         if (auditioning) return@Button
@@ -202,18 +210,25 @@ private fun ComposerSection(onFeedback: (String) -> Unit) {
                         )
                     },
                     enabled = !auditioning,
+                    modifier = Modifier.weight(2f),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (auditioning) Color(0xFF7C4DFF) else MaterialTheme.colorScheme.primary
                     )
-                ) { Text(if (auditioning) "❚❚ 试听中" else "▶ 试听") }
-                Button(onClick = {
-                    gridStr = List(8) { (1..7).random() }.joinToString(" ")
-                    onFeedback("🎲 已随机生成，试试听，说不定有惊喜")
-                }) { Text("🎲 随机灵感") }
-                Button(onClick = {
-                    gridStr = "1 1 1 1 1 1 1 1"
-                    onFeedback("已重置（全为 1/do）")
-                }) { Text("🗑 重置") }
+                ) { Text(if (auditioning) "❚❚ 试听中" else "▶ 试听", maxLines = 1) }
+                Button(
+                    onClick = {
+                        gridStr = List(8) { (1..7).random() }.joinToString(" ")
+                        onFeedback("🎲 已随机生成，试试听，说不定有惊喜")
+                    },
+                    modifier = Modifier.weight(2f)
+                ) { Text("🎲 随机灵感", maxLines = 1) }
+                Button(
+                    onClick = {
+                        gridStr = "1 1 1 1 1 1 1 1"
+                        onFeedback("已重置（全为 1/do）")
+                    },
+                    modifier = Modifier.weight(1.2f)
+                ) { Text("🗑 重置", maxLines = 1) }
             }
             Spacer(Modifier.height(8.dp))
             Text(

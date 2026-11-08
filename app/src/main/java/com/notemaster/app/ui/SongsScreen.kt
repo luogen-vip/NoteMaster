@@ -53,10 +53,12 @@ import kotlinx.coroutines.launch
 fun SongsScreen() {
     // 用索引保存当前打开的歌曲，切换页面后保持
     var openIndex by rememberSaveable { mutableIntStateOf(-1) }
+    // 列表滚动状态提升到这一层：从详情页返回时，列表停在你点进去时的位置
+    val listState = rememberLazyListState()
     if (openIndex >= 0 && openIndex < MusicData.songs.size) {
         SongDetail(MusicData.songs[openIndex]) { openIndex = -1 }
     } else {
-        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(16.dp), state = listState, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 Text("🎵 歌曲读谱训练", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
@@ -94,7 +96,7 @@ fun SongsScreen() {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
-    var playing by rememberSaveable { mutableStateOf(false) }
+    var playing by remember { mutableStateOf(false) }   // 播放态不跨页保存：切走再回来=未播放，不会卡在「播放中」
     var mode by rememberSaveable { mutableIntStateOf(0) }   // 0=逐句跟读(慢) 1=原速
     var activeLine by remember { mutableIntStateOf(-1) }
     var activeNote by remember { mutableIntStateOf(-1) }
@@ -157,6 +159,14 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
     // 系统返回（手势/悬浮球/返回键）也回到歌曲列表，而不是跳出 App
     BackHandler { stop(); onBack() }
 
+    // 离开本页（含切底部导航）时立即掉声音并复位：彻底解决「切页回来卡在播放中、点了没反应」
+    DisposableEffect(Unit) {
+        onDispose {
+            playJob?.cancel()
+            TonePlayer.stopAll()
+        }
+    }
+
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
         // 紧凑标题行：返回 + 歌名 + BPM
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -172,7 +182,22 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
             Text("原曲 ${song.bpm} BPM", fontSize = 11.sp, color = Color(0xFF7BC7FF))
         }
 
-        // 控制行：模式切换 + 播放按钮放一行，把屏幕尽量留给歌词
+        // ★ 播放按钮独占一行、全宽大按钮：一眼就能看到、怎么也不会被挤成小竖条
+        Button(
+            onClick = { if (playing) stop() else start(0) },
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (playing) Color(0xFFB3261E) else Color(0xFF6750A4)
+            )
+        ) {
+            Text(
+                if (playing) "⏸ 停止播放" else "▶ 播放整首歌",
+                fontSize = 17.sp, fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        // 控制行：模式切换
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -187,13 +212,6 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
                 onClick = { stop(); mode = 1 },
                 label = { Text("⚡ 原速") }
             )
-            Spacer(Modifier.weight(1f))
-            Button(
-                onClick = { if (playing) stop() else start(0) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (playing) Color(0xFFB3261E) else MaterialTheme.colorScheme.primary
-                )
-            ) { Text(if (playing) "⏸ 停止" else "▶ 从头播放") }
         }
         Text(
             if (mode == 0)

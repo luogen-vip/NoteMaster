@@ -56,8 +56,7 @@ fun TrainScreen() {
 
     Column(
         Modifier.fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 24.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -100,12 +99,17 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
     var step by rememberSaveable { mutableIntStateOf(deck.draw()) }
     var feedback by rememberSaveable { mutableStateOf("") }
     var streak by rememberSaveable { mutableIntStateOf(0) }
-    var isPlaying by rememberSaveable { mutableStateOf(false) }
+    // 播放态不跨页保存：切走再回来=未播放，不会卡在「播放中」且按钮不可点
+    var isPlaying by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    DisposableEffect(Unit) {
+        onDispose { TonePlayer.stopAll() }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)), shape = RoundedCornerShape(16.dp)) {
-            Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("🔊 听到的是哪个音？", fontSize = 15.sp, color = Color(0xFFB0A7C6))
                 Spacer(Modifier.height(12.dp))
                 Button(
@@ -126,7 +130,7 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
                     Text(if (isPlaying) "❚❚ 播放中…" else "▶ 播放", fontSize = 18.sp)
                 }
                 // 固定高度的反馈区：没答题时也占位，答完弹提示不会把页面往下挤
-                Box(Modifier.height(48.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) {
                     if (feedback.isNotEmpty()) {
                         Text(feedback, fontSize = 16.sp, color = Color(0xFFFFD166), fontWeight = FontWeight.Bold)
                     }
@@ -148,7 +152,7 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
                             feedback = ""
                         }
                     },
-                    modifier = Modifier.weight(1f).height(64.dp),
+                    modifier = Modifier.weight(1f).height(56.dp),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(0.dp)
                 ) { Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -162,7 +166,7 @@ private fun ListenQuiz(record: (Boolean) -> Unit) {
             fontSize = 15.sp, color = if (streak >= 5) Color(0xFFFF6B6B) else Color(0xFF9A92B8)
         )
         Text(
-            "小技巧：先在心里跟唱一遍，再选。答错时立刻重听一次，加深印象。",
+            "训练目标：把 7 个唱名听成肌肉记忆；答错时立刻重听，加深印象。",
             fontSize = 12.sp, color = Color(0xFF77718F)
         )
     }
@@ -218,11 +222,15 @@ private fun NameQuiz(record: (Boolean) -> Unit) {
 private fun EchoGame() {
     // 切走再切回不丢进度：全部状态用 rememberSaveable 保存
     var seq by rememberSaveable { mutableStateOf(listOf<Int>()) }
-    var phase by rememberSaveable { mutableStateOf("idle") } // idle / listen / input
+    var phase by remember { mutableStateOf("idle") } // idle / listen / input（不跨页保存，避免回来卡在“听中”）
     var input by rememberSaveable { mutableStateOf(listOf<Int>()) }
     var feedback by rememberSaveable { mutableStateOf("选择难度开始，先听旋律，再在键盘上复现") }
     var highlight by rememberSaveable { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
+
+    DisposableEffect(Unit) {
+        onDispose { TonePlayer.stopAll() }
+    }
 
     fun playSeq(s: List<Int>, done: () -> Unit) {
         scope.launch {
