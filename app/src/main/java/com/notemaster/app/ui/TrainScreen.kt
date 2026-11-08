@@ -245,12 +245,24 @@ private fun EchoGame() {
     // 旋律取值范围：1..7 中音 + 8 = 高音哆（键盘 8 个键都可能是答案，判定与琴键一一对应）
     val stepFreq: (Int) -> Double = { if (it == 8) MusicData.stepToFreq(1, 1) else MusicData.stepToFreq(it, 0) }
 
+    // 旋律生成：洗牌袋——8 个音（1..7 + 高音哆）洗成一叠逐个抽，不够再洗一叠；
+    // 不写死、不霸屏，每段旋律都尽量覆盖到所有音
+    fun melodyOf(len: Int): List<Int> {
+        val bag = mutableListOf<Int>()
+        while (bag.size < len) bag.addAll((1..8).shuffled())
+        return bag.take(len)
+    }
+
     fun playSeq(s: List<Int>, done: () -> Unit) {
         scope.launch {
             for (n in s) {
                 highlight = n
                 TonePlayer.play(stepFreq(n))
-                delay(520)
+                delay(440)
+                // 每个音结束后先熄灭高亮再停一小段：连续相同的音也能看到两次独立的闪烁，
+                // 用户能明确数出到底弹了几个音
+                highlight = -1
+                delay(140)
             }
             highlight = -1
             done()
@@ -271,14 +283,10 @@ private fun EchoGame() {
                 feedback = "✅ 第 ${progress} 个音对了（${progress}/${seq.size}），继续…"
             }
         } else {
-            // 弹错：归零并自动重播旋律，听完才能再输入——禁止闭眼盲猜，逻辑闭环：听→弹→错→重听→再弹
-            feedback = "❌ 第 ${progress + 1} 个音弹错了，已归零——重新听一遍旋律"
+            // 弹错：归零并停止本轮输入，是否重听由用户决定（点「再听一遍」），不自动循环播放
+            feedback = "❌ 第 ${progress + 1} 个音弹错了，已归零——点「🔊 再听一遍」重听，或点难度开始新旋律"
             progress = 0
-            phase = "listen"
-            playSeq(seq) {
-                phase = "input"
-                feedback = "轮到你了：从第 1 个音开始"
-            }
+            phase = "idle"
         }
     }
 
@@ -290,7 +298,7 @@ private fun EchoGame() {
                     onClick = {
                         // 正在播旋律时不接受重新开始/换难度，避免两次播放重叠打架
                         if (phase == "listen") return@Button
-                        seq = List(len) { (1..8).random() }
+                        seq = melodyOf(len)
                         progress = 0
                         feedback = "🔊 仔细听…"
                         phase = "listen"
@@ -356,7 +364,7 @@ private fun EchoGame() {
             } }
         }
         Text(
-            "这是「听出旋律」的核心训练：必须按顺序逐个对上；弹错会自动重播旋律，听完再从第 1 个音重新弹。听久了你就能像记住歌词一样记住音。",
+            "这是「听出旋律」的核心训练：必须按顺序逐个对上；弹错会归零停下，点「再听一遍」重听或点难度开始新旋律。听久了你就能像记住歌词一样记住音。",
             fontSize = 12.sp, color = Color(0xFF77718F), lineHeight = 20.sp
         )
     }
