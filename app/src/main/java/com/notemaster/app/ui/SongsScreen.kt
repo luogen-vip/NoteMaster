@@ -102,9 +102,6 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
     var playJob by remember { mutableStateOf<Job?>(null) }
     val listState = rememberLazyListState()
 
-    // 系统返回（手势/悬浮球/返回键）也回到歌曲列表，而不是跳出 App
-    BackHandler { stop(); onBack() }
-
     // 预解析每句的音符
     val noteLines = remember(song) { song.lines.map { MusicData.parseMelody(it.melody) } }
 
@@ -156,6 +153,9 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
             runCatching { listState.animateScrollToItem(activeLine) }
         }
     }
+
+    // 系统返回（手势/悬浮球/返回键）也回到歌曲列表，而不是跳出 App
+    BackHandler { stop(); onBack() }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
         // 紧凑标题行：返回 + 歌名 + BPM
