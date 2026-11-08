@@ -1,5 +1,12 @@
 package com.notemaster.app.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -92,6 +101,9 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var playJob by remember { mutableStateOf<Job?>(null) }
     val listState = rememberLazyListState()
+
+    // 系统返回（手势/悬浮球/返回键）也回到歌曲列表，而不是跳出 App
+    BackHandler { stop(); onBack() }
 
     // 预解析每句的音符
     val noteLines = remember(song) { song.lines.map { MusicData.parseMelody(it.melody) } }
@@ -192,37 +204,81 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
             modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
         )
 
-        // ★ 正在播放面板：固定在歌词上方，一眼看到播到哪句、哪个音
+        // ★ 正在播放面板：固定在歌词上方。左侧动态音量条 + 「正在播放」大标签，
+        //   右侧大号当前音徽章，一眼就能看出 App 正在播、播到哪句哪个音。
         if (playing && activeLine >= 0) {
+            val lineNotes = noteLines[activeLine]
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF3A2F63)),
+                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFFD166)),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
             ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "♪ 正在播放 第${activeLine + 1}/${song.lines.size}句",
-                            fontSize = 11.sp, color = Color(0xFF7BC7FF)
+                        // 跳动音量条：只要在播就一直动，用户不用猜就知道在放
+                        val trans = rememberInfiniteTransition(label = "eq")
+                        val h1 by trans.animateFloat(
+                            0f, 1f,
+                            infiniteRepeatable(tween(380, easing = LinearEasing), RepeatMode.Reverse),
+                            label = "h1"
                         )
-                        Spacer(Modifier.weight(1f))
-                        if (activeNote >= 0 && activeNote < noteLines[activeLine].size) {
+                        val h2 by trans.animateFloat(
+                            0f, 1f,
+                            infiniteRepeatable(tween(380, delayMillis = 130, easing = LinearEasing), RepeatMode.Reverse),
+                            label = "h2"
+                        )
+                        val h3 by trans.animateFloat(
+                            0f, 1f,
+                            infiniteRepeatable(tween(380, delayMillis = 260, easing = LinearEasing), RepeatMode.Reverse),
+                            label = "h3"
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.Bottom) {
+                            listOf(h1, h2, h3).forEach { v ->
+                                Box(
+                                    Modifier
+                                        .width(5.dp)
+                                        .height(8.dp + 14.dp * v)
+                                        .background(Color(0xFFFF6B9E), RoundedCornerShape(2.dp))
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
                             Text(
-                                MusicData.displayToken(noteLines[activeLine][activeNote]),
-                                fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFFD166)
+                                "正在播放 · 第${activeLine + 1}/${song.lines.size}句 · 本句第${activeNote + 1}/${lineNotes.size}音",
+                                fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD166)
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                song.lines[activeLine].lyric,
+                                fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
                         }
+                        // 大号「当前音」徽章
+                        if (activeNote >= 0 && activeNote < lineNotes.size) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("当前音", fontSize = 10.sp, color = Color(0xFF9A92B8))
+                                Spacer(Modifier.height(2.dp))
+                                Box(
+                                    Modifier
+                                        .background(Color(0xFFFFD166), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        MusicData.displayToken(lineNotes[activeNote]),
+                                        fontSize = 26.sp, fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF2A2244)
+                                    )
+                                }
+                            }
+                        }
                     }
-                    Text(
-                        song.lines[activeLine].lyric,
-                        fontSize = 17.sp, fontWeight = FontWeight.Bold,
-                        color = Color.White, maxLines = 1
-                    )
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
                     LinearProgressIndicator(
                         progress = { (activeLine + 1f) / song.lines.size },
-                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                         color = Color(0xFFFFD166), trackColor = Color(0xFF52447F)
                     )
                 }

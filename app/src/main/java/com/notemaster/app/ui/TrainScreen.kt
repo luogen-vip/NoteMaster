@@ -25,12 +25,34 @@ import kotlinx.coroutines.launch
  *  1. 听音辨唱名：播放随机音 → 选唱名
  *  2. 音名反应：显示音名(如 E) → 选唱名（条件反射）
  *  3. 旋律跟读：听一段音序 → 在键盘上复现
+ *
+ * 出题规则：洗牌轮换（deck）——把 7 个音洗成一叠，抽完再重新洗，
+ * 保证每一轮 7 个音各出现一次，不会某个音一直不出现、也不会只出某几个。
+ *
+ * 今日战绩实时刷新：答题后立即更新，不需要切换页面。
  */
 @Composable
 fun TrainScreen() {
     val context = LocalContext.current
     var mode by rememberSaveable { mutableIntStateOf(0) }
     val prefs = remember { context.getSharedPreferences("stats", Context.MODE_PRIVATE) }
+
+    // 战绩放进 Compose 状态：答题立刻刷新界面
+    var correctTotal by rememberSaveable { mutableIntStateOf(prefs.getInt("correct", 0)) }
+    var bestStreak by rememberSaveable { mutableIntStateOf(prefs.getInt("best", 0)) }
+
+    // 记录一次答题：写入偏好存储 + 同步刷新状态
+    val record: (Boolean) -> Unit = { ok ->
+        val newStreak = prefs.getInt("streak", 0) + if (ok) 1 else 0
+        prefs.edit()
+            .putInt("correct", prefs.getInt("correct", 0) + if (ok) 1 else 0)
+            .putInt("total", prefs.getInt("total", 0) + 1)
+            .putInt("streak", newStreak)
+            .putInt("best", prefs.getInt("best", 0).coerceAtLeast(newStreak))
+            .apply()
+        correctTotal = prefs.getInt("correct", 0)
+        bestStreak = prefs.getInt("best", 0)
+    }
 
     Column(
         Modifier.fillMaxSize()
@@ -49,35 +71,37 @@ fun TrainScreen() {
             }
         }
         Text(
-            "今日战绩：答对 ${prefs.getInt("correct", 0)} 次 · 连击最高 ${prefs.getInt("best", 0)}",
+            "今日战绩：答对 $correctTotal 次 · 连击最高 $bestStreak",
             fontSize = 13.sp, color = Color(0xFF9A92B8)
         )
         when (mode) {
-            0 -> ListenQuiz(prefs)
-            1 -> NameQuiz(prefs)
+            0 -> ListenQuiz(record)
+            1 -> NameQuiz(record)
             else -> EchoGame()
         }
     }
 }
 
-private fun record(context: Context?, prefs: SharedPreferences?, ok: Boolean) {
-    if (prefs == null) return
-    prefs.edit()
-        .putInt("correct", prefs.getInt("correct", 0) + if (ok) 1 else 0)
-        .putInt("total", prefs.getInt("total", 0) + 1)
-        .putInt("best", prefs.getInt("best", 0).coerceAtLeast(prefs.getInt("streak", 0) + if (ok) 1 else 0))
-        .putInt("streak", if (ok) prefs.getInt("streak", 0) + 1 else 0)
-        .apply()
+/**
+ * 洗牌抽音器：把 1..7 洗成一叠逐个抽，抽完自动重新洗牌。
+ * 每一轮 7 个音各出现且只出现一次——任何音都不会被漏掉或霸屏。
+ */
+class NoteDeck {
+    private var bag: MutableList<Int> = mutableListOf()
+
+    fun draw(): Int {
+        if (bag.isEmpty()) bag = (1..7).shuffled().toMutableList()
+        return bag.removeAt(bag.size - 1)
+    }
 }
 
-private typealias SharedPreferences = android.content.SharedPreferences
-
 @Composable
-private fun ListenQuiz(prefs: SharedPreferences?) {
-    val context = LocalContext.current
-    var step by rememberSaveable { mutableIntStateOf((1..7).random()) }
+private fun ListenQuiz(record: (Boolean) -> Unit) {
+    val deck = remember { NoteDeck() }
+    var step by rememberSaveable { mutableIntStateOf(deck.draw()) }
     var feedback by rememberSaveable { mutableStateOf("") }
     var streak by rememberSaveable { mutableIntStateOf(0) }
+    var isPlaying by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -85,8 +109,22 @@ private fun ListenQuiz(prefs: SharedPreferences?) {
             Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("🔊 听到的是哪个音？", fontSize = 15.sp, color = Color(0xFFB0A7C6))
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = { TonePlayer.play(MusicData.stepToFreq(step, 0)) }) {
-                    Text("▶ 播放", fontSize = 18.sp)
+                Button(
+                    onClick = {
+                        if (isPlaying) return@Button
+                        isPlaying = true
+                        TonePlayer.play(MusicData.stepToFreq(step, 0), 900)
+                        scope.launch {
+                            delay(1000)
+                            isPlaying = false
+                        }
+                    },
+                    enabled = !isPlaying,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isPlaying) Color(0xFF7C4DFF) else MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(if (isPlaying) "❚❚ 播放中…" else "▶ 播放", fontSize = 18.sp)
                 }
                 if (feedback.isNotEmpty()) {
                     Spacer(Modifier.height(10.dp))
@@ -101,11 +139,11 @@ private fun ListenQuiz(prefs: SharedPreferences?) {
                     onClick = {
                         val ok = idx + 1 == step
                         feedback = if (ok) "✅ 对！是 $name" else "❌ 是 ${MusicData.solfege[step - 1]}，再听一次"
-                        record(context, prefs, ok)
+                        record(ok)
                         if (ok) streak += 1 else streak = 0
                         scope.launch {
                             delay(900)
-                            step = (1..7).random()
+                            step = deck.draw()   // 洗牌轮换：7 个音每轮各出现一次
                             feedback = ""
                         }
                     },
@@ -127,9 +165,9 @@ private fun ListenQuiz(prefs: SharedPreferences?) {
 }
 
 @Composable
-private fun NameQuiz(prefs: SharedPreferences?) {
-    val context = LocalContext.current
-    var letter by rememberSaveable { mutableStateOf(MusicData.letters.random()) }
+private fun NameQuiz(record: (Boolean) -> Unit) {
+    val deck = remember { NoteDeck() }
+    var letter by rememberSaveable { mutableStateOf(MusicData.letters[deck.draw() - 1]) }
     var feedback by rememberSaveable { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
@@ -148,10 +186,10 @@ private fun NameQuiz(prefs: SharedPreferences?) {
                         val target = MusicData.letters.indexOf(letter) + 1
                         val ok = idx + 1 == target
                         feedback = if (ok) "✅ $letter = $name = ${target}" else "❌ $letter = ${MusicData.solfege[target - 1]}"
-                        record(context, prefs, ok)
+                        record(ok)
                         scope.launch {
                             delay(700)
-                            letter = MusicData.letters.random()
+                            letter = MusicData.letters[deck.draw() - 1]   // 洗牌轮换，A~B 都会出现
                             feedback = ""
                         }
                     },
