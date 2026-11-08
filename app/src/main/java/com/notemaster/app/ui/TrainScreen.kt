@@ -2,9 +2,12 @@ package com.notemaster.app.ui
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,10 +29,16 @@ import kotlinx.coroutines.launch
 @Composable
 fun TrainScreen() {
     val context = LocalContext.current
-    var mode by remember { mutableStateOf(0) }
+    var mode by rememberSaveable { mutableIntStateOf(0) }
     val prefs = remember { context.getSharedPreferences("stats", Context.MODE_PRIVATE) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("① 听音辨名", "② 音名反应", "③ 旋律跟读").forEachIndexed { i, label ->
                 FilterChip(
@@ -66,9 +75,9 @@ private typealias SharedPreferences = android.content.SharedPreferences
 @Composable
 private fun ListenQuiz(prefs: SharedPreferences?) {
     val context = LocalContext.current
-    var step by remember { mutableIntStateOf((1..7).random()) }
-    var feedback by remember { mutableStateOf("") }
-    var streak by remember { mutableStateOf(prefs?.getInt("streak", 0) ?: 0) }
+    var step by rememberSaveable { mutableIntStateOf((1..7).random()) }
+    var feedback by rememberSaveable { mutableStateOf("") }
+    var streak by rememberSaveable { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -120,8 +129,8 @@ private fun ListenQuiz(prefs: SharedPreferences?) {
 @Composable
 private fun NameQuiz(prefs: SharedPreferences?) {
     val context = LocalContext.current
-    var letter by remember { mutableStateOf(MusicData.letters.random()) }
-    var feedback by remember { mutableStateOf("") }
+    var letter by rememberSaveable { mutableStateOf(MusicData.letters.random()) }
+    var feedback by rememberSaveable { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -155,7 +164,7 @@ private fun NameQuiz(prefs: SharedPreferences?) {
         if (feedback.isNotEmpty()) Text(feedback, fontSize = 15.sp, color = Color(0xFFFFD166))
         Text(
             "训练目标：看到字母 0.5 秒内脱口而出唱名。E→咪、G→嗦 是最容易混的，多刷。",
-            fontSize = 12.sp, color = Color(0xFF77718F)
+            fontSize = 12.sp, color = Color(0xFF77718F), lineHeight = 20.sp
         )
     }
 }
@@ -255,7 +264,7 @@ private fun EchoGame() {
         }
         Text(
             "这是「听出旋律」的核心训练：听久了你就能像记住歌词一样记住音。",
-            fontSize = 12.sp, color = Color(0xFF77718F)
+            fontSize = 12.sp, color = Color(0xFF77718F), lineHeight = 20.sp
         )
     }
 }
