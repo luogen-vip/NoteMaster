@@ -137,7 +137,7 @@ fun SongDetail(song: MusicData.Song, onBack: () -> Unit) {
                     // 下滑音：尾音从本音滑到下一个音级（如 6→5），模拟原唱尾音下坠
                     val freqEnd = if (n.slide < 0 && n.step > 1)
                         MusicData.stepToFreq(n.step - 1, n.octave) else freq
-                    if (freq > 0) TonePlayer.play(freq, (n.beats * beatMs * 0.9f).toInt(), 0.8, freqEnd)
+                    if (freq > 0) TonePlayer.play(freq, (n.beats * beatMs * 0.95f).toInt(), 0.8, freqEnd)
                     delay((n.beats * beatMs).toLong())
                 }
                 // 逐句跟读模式句间停顿帮助消化；原速模式不停顿，保持原曲连续性

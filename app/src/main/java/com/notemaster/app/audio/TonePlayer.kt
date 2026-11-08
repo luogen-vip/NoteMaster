@@ -6,6 +6,7 @@ import android.media.AudioTrack
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.PI
 import kotlin.math.exp
+import kotlin.math.ln
 import kotlin.math.sin
 
 /**
@@ -40,23 +41,38 @@ object TonePlayer {
     fun play(freq: Double, durationMs: Int = 600, volume: Double = 0.8, freqEnd: Double = freq) {
         if (freq <= 0.0) return
         Thread {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+            // 低音区响度补偿：频率越低听感越弱，轻微提升增益（最多 +22%）
+            val comp = 1.0 + (300.0 - freq).coerceAtLeast(0.0) / 300.0 * 0.22
+            val vol = (volume * comp).coerceAtMost(1.0)
             val n = SAMPLE_RATE * durationMs / 1000
             val pcm = ShortArray(n)
             var phase = 0.0
+            val durSec = durationMs / 1000.0
+            // 衰减速率随音长自适应：保证音在整段时值内都保持可闻，
+            // 结尾仍在 ~35% 响度（旧版固定 exp(-3.5t)，长音放到一半就没声了）
+            val decayK = (-ln(0.35) / durSec).coerceIn(1.2, 4.5)
+            // 末尾 45ms 线性淡出，消除音尾截断的「咔」声（破音来源）
+            val fadeN = minOf(n, SAMPLE_RATE * 45 / 1000)
+            val attackN = SAMPLE_RATE / 200   // 5ms 快速起音
             for (i in 0 until n) {
                 val t = i.toDouble() / SAMPLE_RATE
-                // 瞬时频率从 freq 线性滑向 freqEnd（用相位累加保证连续无爆音）
+                // 瞬时频率：按指数（等程）从 freq 匀速滑向 freqEnd，
+                // 人耳对音高是对数感知，指数滑音听起来才是匀速下滑
                 val f = if (freqEnd == freq) freq
-                else freq + (freqEnd - freq) * (t * 1000 / durationMs)
+                else freq * Math.pow(freqEnd / freq, (t / durSec).coerceIn(0.0, 1.0))
                 phase += 2 * PI * f / SAMPLE_RATE
-                // 基频 + 二三次泛音，接近拨弦/钢琴的亮色
+                // 基频 + 四个泛音，更接近人声/钢琴的亮色
                 val v = sin(phase) +
                         0.45 * sin(2 * phase) +
-                        0.18 * sin(3 * phase)
-                // 快速起音 + 指数衰减
-                val attack = if (i < SAMPLE_RATE / 100) i / (SAMPLE_RATE / 100.0) else 1.0
-                val decay = exp(-3.5 * t)
-                pcm[i] = (v * attack * decay * volume * Short.MAX_VALUE / 1.7).toInt().toShort()
+                        0.18 * sin(3 * phase) +
+                        0.09 * sin(4 * phase) +
+                        0.05 * sin(5 * phase)
+                val attack = if (i < attackN) i / attackN.toDouble() else 1.0
+                val decay = exp(-decayK * t)
+                var env = attack * decay
+                if (i >= n - fadeN) env *= (n - i).toDouble() / fadeN
+                pcm[i] = (v * env * vol * Short.MAX_VALUE / 2.0).toInt().toShort()
             }
             val track = AudioTrack.Builder()
                 .setAudioAttributes(
